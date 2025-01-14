@@ -74,7 +74,7 @@ tree_cones <-tbl (con, "cones") %>%
 
 #mean cones per year
 yearly_cones <- group_by(tree_cones, Year) %>% 
-  summarize(num_trees = sum(!is.na(NumNew)),
+  dplyr::summarize(num_trees = sum(!is.na(NumNew)),
             cone_counts = mean(NumNew, na.rm = TRUE),
             cone_index = mean(cone_index, na.rm = TRUE),
             total_cones = mean(total_cones, na.rm = TRUE))
@@ -98,17 +98,33 @@ midden_cones <- midden_cones %>%
 midden_cones$log_cache_size_new <- log(midden_cones$cache_size_new + 1)
 midden_cones$log_total_cones <- log(midden_cones$total_cones + 1)
 
-
-# merge with breeding age -------------------------------------------------
-breeding_age <- read.csv("Input/breeding_age.csv")
-
-breeding_cones <- breeding_age %>%
-  left_join(midden_cones %>% dplyr::select(squirrel_id, year, log_cache_size_new, log_total_cones), 
-            by = c("squirrel_id", "year")) %>%
-  na.omit()
-
 #save
-write.csv(breeding_cones, "Input/breeding_cones.csv", row.names = FALSE)
+write.csv(midden_cones, "Input/midden_cones.csv", row.names = FALSE)
+
+# males cache exactly how much more? --------------------------------------
+#filter data for adults
+adults <- breeding_cones %>% filter(age_class == "adult")
+
+#calculate the average cache size for each sex
+average_cache_size <- adults %>%
+  group_by(sex) %>%
+  summarize(mean_cache_size = mean(cache_size_new, na.rm = TRUE))
+
+#calculate how many times more cones adult males cache compared to adult females
+male_to_female_ratio <- average_cache_size$mean_cache_size[average_cache_size$sex == "M"] /
+  average_cache_size$mean_cache_size[average_cache_size$sex == "F"]
+
+#print the result
+male_to_female_ratio
+
+
+
+
+
+
+
+
+
 
 
 
