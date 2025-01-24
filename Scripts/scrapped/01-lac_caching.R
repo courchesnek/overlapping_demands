@@ -5,8 +5,7 @@ source("Scripts/00-packages.R")
 con <- krsp_connect (host = "krsp.cepb5cjvqban.us-east-2.rds.amazonaws.com",
                      dbname ="krsp",
                      username = Sys.getenv("krsp_user"),
-                     password = Sys.getenv("krsp_password")
-)
+                     password = Sys.getenv("krsp_password"))
 
 #breed_status for females -----------------------------------------------
 breeding <- tbl(con, "litter") %>%
@@ -77,8 +76,8 @@ effect_plot(model_positive, pred = lac_cache,
 #generate predictions
 positive_caches$predicted_cache_size <- predict(model_positive, newdata = positive_caches, type = "response")
 
-#violin plot
-ggplot(positive_caches, aes(x = lac_cache, y = cache_rate, fill = lac_cache)) +
+#violin plot - predicted
+ggplot(positive_caches, aes(x = lac_cache, y = predicted_cache_size, fill = lac_cache)) +
   geom_violin(trim = FALSE, color = "black") +
   geom_boxplot(width = 0.1, fill = "white") +
   geom_jitter(shape = 16, position = position_jitter(0.2), alpha = 0.5) +
@@ -91,6 +90,24 @@ ggplot(positive_caches, aes(x = lac_cache, y = cache_rate, fill = lac_cache)) +
   theme(legend.position = "none") +
   theme(plot.title = element_text(hjust = 0.5))
 
+#violin plot - rate
+females <- ggplot(positive_caches, aes(x = lac_cache, y = cache_rate, fill = lac_cache)) +
+  geom_violin(trim = FALSE, color = "black") +
+  geom_boxplot(width = 0.1, fill = "white") +
+  geom_jitter(shape = 16, position = position_jitter(0.2), alpha = 0.5) +
+  labs(title = "Cache Rate by Lactation Status During Caching Season",
+       x = "Lactation Status During Caching Season",
+       y = "Cache Rate (Log New Cones Cached per Log Total Cones)") +
+  scale_fill_manual(values = c("FALSE" = "#A6CEE3", "TRUE" = "#FDBF6F")) +
+  scale_x_discrete(labels = c("FALSE" = "Non-Lactating", "TRUE" = "Lactating")) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+females
+
+#save
+ggsave("Output/females.jpeg", plot = females, width = 8, height = 6)
 
 
 

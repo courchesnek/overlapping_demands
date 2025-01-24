@@ -42,7 +42,7 @@ plot(model_positive)
 
 # plot --------------------------------------------------------------------
 #violin plot
-ggplot(positive_caches, aes(x = sex, y = cache_rate, fill = sex)) +
+mfnolac <- ggplot(positive_caches, aes(x = sex, y = cache_rate, fill = sex)) +
   geom_violin(trim = FALSE) +
   geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.7) +
   geom_jitter(width = 0.2, size = 1, alpha = 0.5) +
@@ -53,6 +53,10 @@ ggplot(positive_caches, aes(x = sex, y = cache_rate, fill = sex)) +
   theme(plot.title = element_text(hjust = 0.5)) +
   scale_fill_manual(values = c("M" = "#F8766D", "F" = "#00BFC4"))
 
+mfnolac
+
+#save
+ggsave("Output/mfnolac.jpeg", plot = mfnolac, width = 8, height = 6)
 
 
 
