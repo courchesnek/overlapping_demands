@@ -67,33 +67,25 @@ summary(model_positive)
 par(mfrow = c(2, 2))
 plot(model_positive)
 
-
 # plot --------------------------------------------------------------------
 #effect plot
-effect_plot(model_positive, pred = sex,
-            data = positive_caches,
-            interval = TRUE, plot.points = TRUE,
-            x.label = "Sex/Lactation Status",
-            y.label = "Predicted Log Cache Size New",
-            main.title = "Effect of Total Cones, Sex and Lactation Status on Log Cache Size New")
+effect_plot <- effect_plot(
+  model = model_positive,
+  pred = sex,
+  pred.labels = c("Males", "Non-Lactating Females", "Lactating Females"), 
+  x.label = "Sex and Lactation Status in Fall (i.e. during the caching season)",
+  y.label = "Predicted Number of New Cones Cached (log-transformed)",
+  main.title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted for Cone Crop",
+  colors = c("M" = "#66c2a5", "f_non_lac" = "#fc8d62", "f_lac" = "#8da0cb"),
+  interval = TRUE,
+  cat.interval.geom = "errorbar") +
+  scale_x_discrete(
+    labels = c("M" = "Males", "f_non_lac" = "Non-Lactating Females", "f_lac" = "Lactating Females")) +
+  theme_minimal()
 
-#generate predictions from model for plot
-positive_caches$predicted_log_cache_size <- predict(model_positive, newdata = positive_caches, type = "response")
+effect_plot
 
-#violin plot of predictions
-ggplot(positive_caches, aes(x = sex, y = predicted_log_cache_size, fill = sex)) +
-  geom_violin(trim = FALSE, alpha = 0.7) +
-  geom_boxplot(width = 0.2, position = position_dodge(0.9), outlier.shape = NA) +
-  geom_jitter(aes(y = predicted_log_cache_size), color = "black", size = 0.5, alpha = 0.6) +
-  scale_fill_manual(values = c("M" = "#66c2a5", "f_non_lac" = "#fc8d62", "f_lac" = "#8da0cb")) +
-  labs(
-    title = "Predicted Log Cache Size by Sex Category",
-    x = "Sex Category",
-    y = "Predicted Log Cache Size (New)"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-
+#save
+ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 8, height = 6)
 
 
