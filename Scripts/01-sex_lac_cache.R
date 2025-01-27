@@ -12,7 +12,7 @@ breeding <- tbl(con, "litter") %>%
   collect()
 
 females <- breeding %>%
-  dplyr::select(yr, squirrel_id, br, fieldBDate) %>%
+  dplyr::select(yr, squirrel_id, br, fieldBDate, grid) %>%
   filter(br %in% c(0, 1)) %>%
   mutate(
     fieldBDate = as.Date(fieldBDate, format = "%Y-%m-%d"),
@@ -27,13 +27,14 @@ females <- breeding %>%
       FALSE,
       lac_end > as.Date(paste0(year, "-08-16"))))
 
+females <- females %>%
+  filter(grid %in% c("KL", "SU", "CH"))
+
 #save
 write.csv(females, "Input/females.csv", row.names = FALSE)
 
-
 # pull in male cache data -------------------------------------------------
 midden_cones <- read.csv("Input/midden_cones.csv")
-
 
 # prepare data to merge ---------------------------------------------------
 #change female sex values to lac non lac in fall
@@ -48,6 +49,20 @@ mid_cones <- midden_cones %>%
   dplyr::select(-sex.x, -sex.y, -cache_size_new, -total_cones) %>%
   na.omit()
 
+
+# data summary ------------------------------------------------------------
+summary_table <- positive_caches %>%
+  group_by(sex) %>%
+  summarise(
+    n = n(),  # Sample size
+    mean_log_cache_size = mean(log_cache_size_new, na.rm = TRUE),
+    sd_log_cache_size = sd(log_cache_size_new, na.rm = TRUE),
+    mean_log_total_cones = mean(log_total_cones, na.rm = TRUE),
+    sd_log_total_cones = sd(log_total_cones, na.rm = TRUE)) %>%
+  arrange(factor(sex, levels = c("M", "f_non_lac", "f_lac")))
+
+#save
+write.csv(summary_table, file = "Output/data_summary.csv", row.names = FALSE)
 
 # model -------------------------------------------------------------------
 ##filter for positive caching events only (i.e. only want cache size new > 0)
@@ -73,9 +88,9 @@ effect_plot <- effect_plot(
   model = model_positive,
   pred = sex,
   pred.labels = c("Males", "Non-Lactating Females", "Lactating Females"), 
-  x.label = "Sex and Lactation Status in Fall (i.e. during the caching season)",
-  y.label = "Predicted Number of New Cones Cached (log-transformed)",
-  main.title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted for Cone Crop",
+  x.label = "Sex and lactation status during the fall caching season",
+  y.label = "Predicted number of new cones cached (log-transformed)",
+  main.title = "Effect of sex and lactation status on cone caching, adjusted for cone crop",
   colors = c("M" = "#66c2a5", "f_non_lac" = "#fc8d62", "f_lac" = "#8da0cb"),
   interval = TRUE,
   cat.interval.geom = "errorbar") +
