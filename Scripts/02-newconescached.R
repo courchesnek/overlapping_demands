@@ -102,20 +102,19 @@ midden_cones$log_total_cones <- log(midden_cones$total_cones + 1)
 write.csv(midden_cones, "Input/midden_cones.csv", row.names = FALSE)
 
 # males cache exactly how much more? --------------------------------------
-#filter data for adults
-adults <- breeding_cones %>% filter(age_class == "adult")
+# males cache exactly how much more? --------------------------------------
+#scale the cache size by the total cones produced in each year
+midden_cones$scaled_cache_size <- midden_cones$cache_size_new / midden_cones$total_cones
 
-#calculate the average cache size for each sex
-average_cache_size <- adults %>%
+avg_scaled_cache <- midden_cones %>%
   group_by(sex) %>%
-  summarize(mean_cache_size = mean(cache_size_new, na.rm = TRUE))
+  summarise(mean_scaled_cache = mean(scaled_cache_size, na.rm = TRUE))
 
-#calculate how many times more cones adult males cache compared to adult females
-male_to_female_ratio <- average_cache_size$mean_cache_size[average_cache_size$sex == "M"] /
-  average_cache_size$mean_cache_size[average_cache_size$sex == "F"]
+ratio_males_to_females <- avg_scaled_cache$mean_scaled_cache[avg_scaled_cache$sex == "M"] / 
+  avg_scaled_cache$mean_scaled_cache[avg_scaled_cache$sex == "F"]
 
-#print the result
-male_to_female_ratio
+ratio_males_to_females
+#across years (i.e. cone crops) males cache approximately 2.08 times as many new cones as females do. 
 
 
 

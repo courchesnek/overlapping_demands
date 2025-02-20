@@ -49,6 +49,36 @@ mid_cones <- midden_cones %>%
   dplyr::select(-sex.x, -sex.y, -cache_size_new, -total_cones) %>%
   na.omit()
 
+# model -------------------------------------------------------------------
+#create a binary column for caching occurrence
+mid_cones$cache_present <- ifelse(mid_cones$log_cache_size_new > 0, 1, 0)
+
+#fit a mixed logistic regression model (binary outcome)
+model_binary <- glmer(cache_present ~ sex + log_total_cones + (1 | squirrel_id), 
+                      data = mid_cones, 
+                      family = binomial(link = "logit"),
+                      control = glmerControl(optimizer = "bobyqa")) #helps convergence
+
+#model summary
+summary(model_binary)
+
+##filter for positive caching events only (i.e. only want cache size new > 0)
+positive_caches <- mid_cones %>%
+  filter(log_cache_size_new > 0)
+
+#ensure sex is a factor and has the appropriate levels (M as baseline)
+positive_caches$sex <- factor(positive_caches$sex, levels = c("M", "f_non_lac", "f_lac"))
+
+#fit mixed-effects model with squirrel_id as a random intercept
+model_positive <- lmer(log_cache_size_new ~ sex + log_total_cones + (1 | squirrel_id), 
+                       data = positive_caches, 
+                       REML = FALSE)
+
+#model summary
+summary(model_positive)
+
+plot(model_positive)  #residual plots
+qqnorm(resid(model_positive)); qqline(resid(model_positive))
 
 # data summary ------------------------------------------------------------
 summary_table <- positive_caches %>%
@@ -63,24 +93,6 @@ summary_table <- positive_caches %>%
 
 #save
 write.csv(summary_table, file = "Output/data_summary.csv", row.names = FALSE)
-
-# model -------------------------------------------------------------------
-##filter for positive caching events only (i.e. only want cache size new > 0)
-positive_caches <- mid_cones %>%
-  filter(log_cache_size_new > 0)
-
-#ensure sex is a factor and has the appropriate levels
-positive_caches$sex <- factor(positive_caches$sex, levels = c("M", "f_non_lac", "f_lac"))
-
-#fit the linear model
-model_positive <- lm(log_cache_size_new ~ sex + log_total_cones, data = positive_caches)
-
-#model summary
-summary(model_positive)
-
-#check residuals
-par(mfrow = c(2, 2))
-plot(model_positive)
 
 # plot --------------------------------------------------------------------
 #effect plot
@@ -102,5 +114,18 @@ effect_plot
 
 #save
 ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 8, height = 6)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
