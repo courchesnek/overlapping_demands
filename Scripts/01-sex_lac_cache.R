@@ -113,7 +113,6 @@ model_output <- model_output %>%
 
 write.csv(model_output, "Output/model_output.csv", row.names = FALSE)
 
-
 # compare between females -------------------------------------------------
 emm <- emmeans(model_positive, ~ sex)
 
@@ -149,13 +148,13 @@ effect_plot <- effect_plot(
   model = model_positive,
   pred = sex,
   x.label = "Sex and lactation status during the fall caching season",
-  y.label = "Predicted number of new cones cached (log-transformed)",
+  y.label = "Number of new cones cached (log-transformed)",
   main.title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted by Cone Availability",
   interval = TRUE,
   cat.interval.geom = "errorbar",
   colors = c("M" = "#F8766D", "f_non_breeder" = "#7CAE00", "f_weaned" = "#C77CFF","f_lac" = "#00BFC4")) + 
   scale_x_discrete(
-    labels = c("M" = "Males", "f_non_breeder" = "Non-Breeding Females", "f_weaned" = "Weaned Females", "f_lac" = "Lactating Females")) +
+    labels = c("M" = "Males", "f_non_breeder" = "Female:Non-Breeder", "f_weaned" = "Female:Weaned", "f_lac" = "Female:Lactating")) +
   theme_minimal() +
   theme(plot.title = element_text(size = 12, face = "bold", hjust = 0.5))
 
@@ -165,16 +164,41 @@ effect_plot
 ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 8, height = 6)
 
 
+# plot absolute cone numbers ----------------------------------------------
+new_data <- data.frame(
+  sex = factor(c("M", "f_non_breeder", "f_weaned", "f_lac"),
+               levels = c("M", "f_non_breeder", "f_weaned", "f_lac")),
+  log_total_cones = rep(mean(positive_caches$log_total_cones, na.rm = TRUE), 4),
+  squirrel_id = factor(rep("dummy", 4)))
 
+pred_int <- predictInterval(model_positive,
+                            newdata = new_data,
+                            level = 0.95,
+                            n.sims = 1000,         # number of simulations for stable estimates
+                            stat = "mean",         # use the mean of simulations
+                            type = "linear.prediction",  # predictions on the linear predictor scale
+                            which = "fixed",
+                            include.resid.var = FALSE)
 
+new_data$predicted_absolute <- exp(pred_int$fit)
+new_data$lower <- exp(pred_int$lwr)
+new_data$upper <- exp(pred_int$upr)
 
+absolute_values <- ggplot(new_data, aes(x = sex, y = predicted_absolute, color = sex)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(x = "Sex",
+       y = "Number of New Cones Cached",
+       title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted by Cone Availability") +
+  scale_x_discrete(
+    labels = c("M" = "Males", "f_non_breeder" = "Female:Non-Breeder", "f_weaned" = "Female:Weaned", "f_lac" = "Female:Lactating")) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+        axis.title = element_text(size = 12),
+        legend.position = "none")
 
+absolute_values
 
-
-
-
-
-
-
-
+#save
+ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 10, height = 6)
 
