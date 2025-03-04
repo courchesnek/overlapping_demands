@@ -135,6 +135,7 @@ write.csv(summary_table, file = "Output/data_summary.csv", row.names = FALSE)
 
 #how many years of data?
 length(unique(positive_caches$year))
+unique(positive_caches$year)
 
 #how many grids?
 length(unique(positive_caches$grid))
@@ -193,12 +194,13 @@ absolute_values <- ggplot(new_data, aes(x = sex, y = predicted_absolute, color =
   scale_x_discrete(
     labels = c("M" = "Males", "f_non_breeder" = "Female:Non-Breeder", "f_weaned" = "Female:Weaned", "f_lac" = "Female:Lactating")) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        axis.title = element_text(size = 12),
+  theme(text = element_text(size = 18),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        axis.title = element_text(size = 18),
         legend.position = "none")
 
 absolute_values
 
 #save
-ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 10, height = 6)
+ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 12, height = 6)
 
