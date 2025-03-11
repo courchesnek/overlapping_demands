@@ -21,7 +21,7 @@ females <- breeding %>%
   rename(
     breed_status = br,
     year = yr) %>%
-  filter(!(breed_status == 1 & is.na(fieldBDate))) %>%
+  filter(!(breed_status == 1 & is.na(fieldBDate))) %>% #remove breeders with no birthdate
   mutate(
     lac_cache = if_else(!is.na(lac_end) & lac_end > (caching_date + 7), TRUE, FALSE), #add a grace period for those who barely overlap with cache start - not true overlaps
     weaned_before_caching = if_else(breed_status == 1 & !lac_cache, TRUE, FALSE),
@@ -50,84 +50,83 @@ f <- females %>%
 mid_cones <- midden_cones %>%
   left_join(f %>% dplyr::select(year, squirrel_id, sex), by = c("year", "squirrel_id")) %>%
   mutate(sex = ifelse(sex.x == "F", sex.y, sex.x)) %>%
-  dplyr::select(-sex.x, -sex.y, -cache_size_new, -total_cones) %>%
+  dplyr::select(-sex.x, -sex.y) %>%
   filter(grid %in% c("KL", "SU", "CH")) %>%
-  na.omit()
+  na.omit() %>%
+  dplyr::select(year, grid, squirrel_id, sex, cache_size_new, log_cache_size_new, total_cones, log_total_cones)
 
 # model -------------------------------------------------------------------
+#standardize predictors
+mid_cones$total_cones_sc <- scale(mid_cones$total_cones)
+
 #create a binary column for caching occurrence
-mid_cones$cache_present <- ifelse(mid_cones$log_cache_size_new > 0, 1, 0)
+mid_cones$cache_present <- ifelse(mid_cones$cache_size_new > 0, 1, 0)
 
-#fit a mixed logistic regression model (binary outcome)
-model_binary <- glmer(cache_present ~ sex + (1 | squirrel_id), 
+#fit the binary model for caching occurrence - which is influenced by cone availability
+model_binary <- glmmTMB(cache_present ~ total_cones_sc + (1 | squirrel_id) + (1 | year), 
                       data = mid_cones, 
-                      family = binomial(link = "logit"),
-                      control = glmerControl(optimizer = "bobyqa")) #helps convergence
+                      family = binomial(link = "logit"))
 
-#model summary
 summary(model_binary)
+
+#residual plots
+sim_res_binary <- simulateResiduals(model_binary)
+plot(sim_res_binary)
+
+testOutliers(sim_res_binary, type = "bootstrap") #no extreme outliers
 
 ##filter for positive caching events only (i.e. only want cache size new > 0)
 positive_caches <- mid_cones %>%
-  filter(log_cache_size_new > 0)
+  filter(cache_size_new > 0)
 
 #ensure sex is a factor and has the appropriate levels (M as baseline)
 positive_caches$sex <- factor(
   positive_caches$sex, 
   levels = c("M", "f_non_breeder", "f_weaned", "f_lac"))
 
-#fit mixed-effects model with squirrel_id as a random intercept
-model_positive <- lmer(log_cache_size_new ~ sex + log_total_cones + (1 | squirrel_id), 
-                       data = positive_caches, 
-                       REML = FALSE)
+#fit the gamma model for cache size among those years that squirrels do cache - which is now influenced by sex/lac status
+model_positive <- glmmTMB(cache_size_new ~ sex + total_cones_sc + (1 | squirrel_id) + (1 | year), 
+                        data = positive_caches, 
+                        family = Gamma(link = "log"))
 
-#model summary
 summary(model_positive)
 
-#model reference categories?
-contrasts(positive_caches$sex) #males are the reference category
-
-plot(model_positive)  #residual plots
-qqnorm(resid(model_positive)); qqline(resid(model_positive))
-
-#get p-values
-model_positive_test <- lmer(log_cache_size_new ~ sex + log_total_cones + (1 | squirrel_id),
-                            data = positive_caches)
-
-summary(model_positive_test)
+#residual plots
+sim_res_hurdle <- simulateResiduals(model_positive)
+plot(sim_res_hurdle)
 
 #clean up model output to save as csv
-model_output <- tidy(model_positive_test)
+model_output <- tidy(model_positive)
 
 model_output <- model_output %>%
-  dplyr::select(-effect, -group)
+  dplyr::select(-effect, -group, -component)
 
 model_output <- model_output[-6, ]
 
 model_output <- model_output %>%
-  rename(tvalue = statistic,
+  rename(zvalue = statistic,
          pvalue = p.value)
 
 model_output <- model_output %>%
-  mutate(across(c(estimate, std.error, tvalue, pvalue), ~round(., 3)))
+  mutate(across(c(estimate, std.error, zvalue, pvalue), ~round(., 4)))
 
 write.csv(model_output, "Output/model_output.csv", row.names = FALSE)
 
 # compare between females -------------------------------------------------
-emm <- emmeans(model_positive, ~ sex)
+emm <- emmeans(model_positive, ~ sex, type = "response")#predictions on absolute scale instead of log
+df_emm <- as.data.frame(emm)
 
-#compare all pairs of sex categories
 pairs(emm, adjust = "tukey")
 
-# data summary ------------------------------------------------------------
+# data summary - raw data ------------------------------------------------------------
 summary_table <- positive_caches %>%
   group_by(sex) %>%
   summarise(
     n = n(),
-    mean_log_cache_size = mean(log_cache_size_new, na.rm = TRUE),
-    sd_log_cache_size = sd(log_cache_size_new, na.rm = TRUE),
-    mean_log_total_cones = mean(log_total_cones, na.rm = TRUE),
-    sd_log_total_cones = sd(log_total_cones, na.rm = TRUE)) %>%
+    mean_cache_size = mean(cache_size_new, na.rm = TRUE),
+    sd_cache_size = sd(cache_size_new, na.rm = TRUE),
+    mean_total_cones = mean(total_cones, na.rm = TRUE),
+    sd_total_cones = sd(total_cones, na.rm = TRUE)) %>%
   arrange(factor(sex, levels = c("M", "f_non_breeder", "f_weaned", "f_lac")))
 
 #save
@@ -143,64 +142,79 @@ length(unique(positive_caches$grid))
 #how many squirrels?
 length(unique(positive_caches$squirrel_id))
 
-# plot --------------------------------------------------------------------
-#effect plot
-effect_plot <- effect_plot(
-  model = model_positive,
-  pred = sex,
-  x.label = "Sex and lactation status during the fall caching season",
-  y.label = "Number of new cones cached (log-transformed)",
-  main.title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted by Cone Availability",
-  interval = TRUE,
-  cat.interval.geom = "errorbar",
-  colors = c("M" = "#F8766D", "f_non_breeder" = "#7CAE00", "f_weaned" = "#C77CFF","f_lac" = "#00BFC4")) + 
+# plot predictions in absolute cone numbers ----------------------------------------------
+absolute_values <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  scale_y_continuous(limits = c(0, 10000)) +
   scale_x_discrete(
-    labels = c("M" = "Males", "f_non_breeder" = "Female:Non-Breeder", "f_weaned" = "Female:Weaned", "f_lac" = "Female:Lactating")) +
+    labels = c(
+      "M" = "Males",
+      "f_non_breeder" = "Female:Non-Breeder",
+      "f_weaned" = "Female:Weaned",
+      "f_lac" = "Female:Lactating")) +
+  labs(
+    x = "Sex",
+    y = "Number of New Cones Cached",
+    title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
+  scale_color_manual(
+    values = c(
+      "M" = "#F8766D", 
+      "f_non_breeder" = "#7CAE00", 
+      "f_weaned" = "#C77CFF", 
+      "f_lac" = "#00BFC4")) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 12, face = "bold", hjust = 0.5))
-
-effect_plot
-
-#save
-ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 8, height = 6)
-
-
-# plot absolute cone numbers ----------------------------------------------
-new_data <- data.frame(
-  sex = factor(c("M", "f_non_breeder", "f_weaned", "f_lac"),
-               levels = c("M", "f_non_breeder", "f_weaned", "f_lac")),
-  log_total_cones = rep(mean(positive_caches$log_total_cones, na.rm = TRUE), 4),
-  squirrel_id = factor(rep("dummy", 4)))
-
-pred_int <- predictInterval(model_positive,
-                            newdata = new_data,
-                            level = 0.95,
-                            n.sims = 1000,         # number of simulations for stable estimates
-                            stat = "mean",         # use the mean of simulations
-                            type = "linear.prediction",  # predictions on the linear predictor scale
-                            which = "fixed",
-                            include.resid.var = FALSE)
-
-new_data$predicted_absolute <- exp(pred_int$fit)
-new_data$lower <- exp(pred_int$lwr)
-new_data$upper <- exp(pred_int$upr)
-
-absolute_values <- ggplot(new_data, aes(x = sex, y = predicted_absolute, color = sex)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  labs(x = "Sex",
-       y = "Number of New Cones Cached",
-       title = "Effect of Sex and Lactation Status on Cone Caching, Adjusted by Cone Availability") +
-  scale_x_discrete(
-    labels = c("M" = "Males", "f_non_breeder" = "Female:Non-Breeder", "f_weaned" = "Female:Weaned", "f_lac" = "Female:Lactating")) +
-  theme_minimal() +
-  theme(text = element_text(size = 18),
-        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
-        axis.title = element_text(size = 18),
-        legend.position = "none")
+  theme(
+    text = element_text(size = 22),
+    plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 18),
+    axis.title.x = element_text(margin = margin(t=15), size = 22),
+    axis.title.y = element_text(margin = margin(r=15), size = 22),
+    axis.text.x = element_text(hjust = 0.5, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
+    legend.position = "none")
 
 absolute_values
 
 #save
-ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 12, height = 6)
+ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 12, height = 7)
+
+# dummy plot for predictions ----------------------------------------------
+dummy_data <- tibble(
+  sex = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
+  predicted  = c(3000, 3000, 3000, 1500),
+  lower      = c(2800, 2800, 2800, 1300),
+  upper      = c(3200, 3200, 3200, 1700)) %>%
+  mutate(sex = factor(c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
+                 levels = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating")))
+
+dummy_plot <- ggplot(dummy_data, aes(x = sex, y = predicted, colour = sex)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(x = "Sex",
+       y = "Number of New Cones Cached",
+       title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
+  theme_minimal() +
+  theme(text = element_text(size = 22),
+        plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
+        axis.title = element_text(size = 18),
+        axis.title.x = element_text(margin = margin(t=15), size = 22),
+        axis.title.y = element_text(margin = margin(r=15), size = 22),
+        axis.text.x = element_text(hjust = 0.5, color = "black"),
+        axis.text.y = element_text(color = "black"),
+        plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
+        legend.position = "none")
+
+dummy_plot
+
+
+#save
+ggsave("Output/dummy_plot.jpeg", plot = dummy_plot, width = 12, height = 7)
+
+
+
+
+
+
 
