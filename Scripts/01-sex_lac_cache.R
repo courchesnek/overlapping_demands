@@ -70,7 +70,7 @@ model_binary <- glmmTMB(cache_present ~ total_cones_sc + (1 | squirrel_id) + (1 
 summary(model_binary)
 
 #residual plots
-sim_res_binary <- simulateResiduals(model_binary)
+sim_res_binary <- simulateResiduals(model_binary, n = 2500)
 plot(sim_res_binary)
 
 testOutliers(sim_res_binary, type = "bootstrap") #no extreme outliers
@@ -89,11 +89,19 @@ model_positive <- glmmTMB(cache_size_new ~ sex + total_cones_sc + (1 | squirrel_
                         data = positive_caches, 
                         family = Gamma(link = "log"))
 
+#model_reduced <- glmmTMB(cache_size_new ~ sex + total_cones_sc + (1 | squirrel_id), 
+                         #data = positive_caches, 
+                         #family = Gamma(link = "log"))
+
+#anova(model_positive, model_reduced) - keep year random effect!!!
+
 summary(model_positive)
 
 #residual plots
 sim_res_hurdle <- simulateResiduals(model_positive)
 plot(sim_res_hurdle)
+
+testOutliers(sim_res_hurdle, type = "bootstrap") #no extreme outliers
 
 #clean up model output to save as csv
 model_output <- tidy(model_positive)
@@ -101,6 +109,7 @@ model_output <- tidy(model_positive)
 model_output <- model_output %>%
   dplyr::select(-effect, -group, -component)
 
+model_output <- model_output[-6, ]
 model_output <- model_output[-6, ]
 
 model_output <- model_output %>%
@@ -112,11 +121,69 @@ model_output <- model_output %>%
 
 write.csv(model_output, "Output/model_output.csv", row.names = FALSE)
 
-# compare between females -------------------------------------------------
-emm <- emmeans(model_positive, ~ sex, type = "response")#predictions on absolute scale instead of log
+
+# generate predictions and compare between sexes --------------------------
+emm <- emmeans(model_positive, ~ sex, 
+               at = list(total_cones_sc = 0), 
+               type = "response")
+
 df_emm <- as.data.frame(emm)
 
-pairs(emm, adjust = "tukey")
+##compare between female groups
+comp <- pairs(emm, adjust = "tukey", infer = c(TRUE, TRUE))
+comp_df <- as.data.frame(comp)
+
+#rename columns
+comp_df <- comp_df %>%
+  rename(
+    comparison = contrast,
+    std.error = SE,
+    lowerCI = asymp.LCL,
+    upperCI = asymp.UCL,
+    z.value = z.ratio) %>%
+  dplyr::select(-df, -null) %>%
+  mutate(across(c(ratio, std.error, lowerCI, upperCI, z.value, p.value), ~round(., 4)))
+   
+#save
+write.csv(comp_df, "Output/groups_comparisons.csv", row.names = FALSE)
+
+# plot predictions -------------------------------------------
+effect_plot <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.3, linewidth = 1.0) +
+  scale_y_continuous(limits = c(0, 8000)) +
+  scale_x_discrete(
+    labels = c(
+      "M" = "Males",
+      "f_non_breeder" = "Female:Non-Breeder",
+      "f_weaned" = "Female:Weaned",
+      "f_lac" = "Female:Lactating")) +
+  labs(
+    x = "Sex",
+    y = "Number of New Cones Cached",
+    title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
+  scale_color_manual(
+    values = c(
+      "M" = "#F8766D", 
+      "f_non_breeder" = "#7CAE00", 
+      "f_weaned" = "#C77CFF", 
+      "f_lac" = "#00BFC4")) +
+  theme_minimal(base_size = 25) +
+  theme(
+    text = element_text(size = 22),
+    plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
+    axis.title = element_text(size = 18),
+    axis.title.x = element_text(margin = margin(t = 15), size = 22),
+    axis.title.y = element_text(margin = margin(r = 15), size = 22),
+    axis.text.x = element_text(hjust = 0.5, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
+    legend.position = "none")
+
+effect_plot
+
+#save
+ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 12, height = 7)
 
 # data summary - raw data ------------------------------------------------------------
 summary_table <- positive_caches %>%
@@ -141,44 +208,6 @@ length(unique(positive_caches$grid))
 
 #how many squirrels?
 length(unique(positive_caches$squirrel_id))
-
-# plot predictions in absolute cone numbers ----------------------------------------------
-absolute_values <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
-  scale_y_continuous(limits = c(0, 10000)) +
-  scale_x_discrete(
-    labels = c(
-      "M" = "Males",
-      "f_non_breeder" = "Female:Non-Breeder",
-      "f_weaned" = "Female:Weaned",
-      "f_lac" = "Female:Lactating")) +
-  labs(
-    x = "Sex",
-    y = "Number of New Cones Cached",
-    title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
-  scale_color_manual(
-    values = c(
-      "M" = "#F8766D", 
-      "f_non_breeder" = "#7CAE00", 
-      "f_weaned" = "#C77CFF", 
-      "f_lac" = "#00BFC4")) +
-  theme_minimal() +
-  theme(
-    text = element_text(size = 22),
-    plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
-    axis.title = element_text(size = 18),
-    axis.title.x = element_text(margin = margin(t=15), size = 22),
-    axis.title.y = element_text(margin = margin(r=15), size = 22),
-    axis.text.x = element_text(hjust = 0.5, color = "black"),
-    axis.text.y = element_text(color = "black"),
-    plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
-    legend.position = "none")
-
-absolute_values
-
-#save
-ggsave("Output/absolute_values.jpeg", plot = absolute_values, width = 12, height = 7)
 
 # dummy plot for predictions ----------------------------------------------
 dummy_data <- tibble(
