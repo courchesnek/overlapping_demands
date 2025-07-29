@@ -28,7 +28,7 @@ females <- breeding %>%
     non_breeder = if_else(breed_status == 0, TRUE, FALSE))
     
 females <- females %>%
-  filter(grid %in% c("KL", "SU", "CH"))
+  filter(grid %in% c("KL", "SU", "CH", "BT", "JO"))
 
 #save
 write.csv(females, "Input/females.csv", row.names = FALSE)
@@ -51,7 +51,7 @@ mid_cones <- midden_cones %>%
   left_join(f %>% dplyr::select(year, squirrel_id, sex), by = c("year", "squirrel_id")) %>%
   mutate(sex = ifelse(sex.x == "F", sex.y, sex.x)) %>%
   dplyr::select(-sex.x, -sex.y) %>%
-  filter(grid %in% c("KL", "SU", "CH")) %>%
+  filter(grid %in% c("KL", "SU", "CH", "BT", "JO") | (grid == "JO" & year >= 2013)) %>%
   na.omit() %>%
   dplyr::select(year, grid, squirrel_id, sex, cache_size_new, log_cache_size_new, total_cones, log_total_cones)
 
@@ -151,7 +151,6 @@ write.csv(comp_df, "Output/groups_comparisons.csv", row.names = FALSE)
 effect_plot <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.3, linewidth = 1.0) +
-  scale_y_continuous(limits = c(0, 8000)) +
   scale_x_discrete(
     labels = c(
       "M" = "Males",
