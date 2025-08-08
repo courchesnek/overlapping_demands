@@ -148,9 +148,9 @@ comp_df <- comp_df %>%
 write.csv(comp_df, "Output/groups_comparisons.csv", row.names = FALSE)
 
 # plot predictions -------------------------------------------
-effect_plot <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.3, linewidth = 1.0) +
+effect_plot <- ggplot(df_emm, aes(x = sex, y = response, color = sex, fill = sex, shape = sex)) +
+  geom_point(size = 6, stroke = 1.2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.3, linewidth = 1.8) +
   scale_x_discrete(
     labels = c(
       "M" = "Males",
@@ -163,14 +163,24 @@ effect_plot <- ggplot(df_emm, aes(x = sex, y = response, color = sex)) +
     title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
   scale_color_manual(
     values = c(
-      "M" = "#F8766D", 
-      "f_non_breeder" = "#7CAE00", 
-      "f_weaned" = "#C77CFF", 
-      "f_lac" = "#00BFC4")) +
+      "M" = "#E69F00", 
+      "f_non_breeder" = "#56B4E9", 
+      "f_weaned" = "#009E73", 
+      "f_lac" = "#CC79A7")) +
+  scale_shape_manual(values = c(
+      "M"              = 16,  
+      "f_non_breeder" = 17, 
+      "f_weaned"      = 15, 
+      "f_lac"   = 23)) +
+  scale_fill_manual(values = c(
+    "M"            = "#E69F00", 
+    "f_non_breeder"= "#56B4E9", 
+    "f_weaned"     = "#009E73", 
+    "f_lac"        = "#CC79A7")) +
   theme_minimal(base_size = 25) +
   theme(
     text = element_text(size = 22),
-    plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
+    plot.title = element_text(size = 25, face = "bold", hjust = 0.5, margin = margin(b = 20)),
     axis.title = element_text(size = 18),
     axis.title.x = element_text(margin = margin(t = 15), size = 22),
     axis.title.y = element_text(margin = margin(r = 15), size = 22),
