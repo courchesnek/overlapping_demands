@@ -195,28 +195,48 @@ effect_plot
 ggsave("Output/effect_plot.jpeg", plot = effect_plot, width = 12, height = 7)
 
 # data summary - raw data ------------------------------------------------------------
-summary_table <- positive_caches %>%
+# 1) Sex-specific caching summaries
+cache_by_sex <- positive_caches %>%
+  filter(cache_size_new > 0 | !is.na(cache_size_new)) %>%
   group_by(sex) %>%
   summarise(
-    n = n(),
-    mean_cache_size = mean(cache_size_new, na.rm = TRUE),
-    sd_cache_size = sd(cache_size_new, na.rm = TRUE),
-    mean_total_cones = mean(total_cones, na.rm = TRUE),
-    sd_total_cones = sd(total_cones, na.rm = TRUE)) %>%
-  arrange(factor(sex, levels = c("M", "f_non_breeder", "f_weaned", "f_lac")))
+    n_cache         = sum(!is.na(cache_size_new)),
+    mean_cache      = mean(cache_size_new, na.rm = TRUE),
+    sd_cache        = sd(cache_size_new, na.rm = TRUE),
+    se_cache        = sd_cache / sqrt(n_cache),
+    tcrit_cache     = ifelse(n_cache > 1, qt(0.975, df = n_cache - 1), NA_real_),
+    ci_low_cache    = mean_cache - tcrit_cache * se_cache,
+    ci_high_cache   = mean_cache + tcrit_cache * se_cache,
+    min_cache       = ifelse(n_cache > 0, min(cache_size_new, na.rm = TRUE), NA_real_),
+    max_cache       = ifelse(n_cache > 0, max(cache_size_new, na.rm = TRUE), NA_real_))
 
-#save
-write.csv(summary_table, file = "Output/data_summary.csv", row.names = FALSE)
+# 2) year-level cone availability (n = 14)
+avail_year <- positive_caches %>%
+  distinct(year, total_cones) %>%       # one value per year
+  summarise(
+    n_years   = n(),
+    mean_av   = mean(total_cones, na.rm = TRUE),
+    sd_av     = sd(total_cones, na.rm = TRUE),
+    se_av     = sd_av / sqrt(n_years),
+    tcrit     = ifelse(n_years > 1, qt(0.975, df = n_years - 1), NA_real_),
+    ci_lo_av  = mean_av - tcrit * se_av,
+    ci_hi_av  = mean_av + tcrit * se_av,
+    min_av    = min(total_cones, na.rm = TRUE),
+    max_av    = max(total_cones, na.rm = TRUE))
 
-#how many years of data?
-length(unique(positive_caches$year))
-unique(positive_caches$year)
+#save summary tables
+write.csv(cache_by_sex, file = "Output/cache_summary.csv", row.names = FALSE)
+write.csv(avail_year, file = "Output/treecones_summary.csv", row.names = FALSE)
 
-#how many grids?
-length(unique(positive_caches$grid))
-
-#how many squirrels?
-length(unique(positive_caches$squirrel_id))
+# #how many years of data?
+# length(unique(positive_caches$year))
+# unique(positive_caches$year)
+# 
+# #how many grids?
+# length(unique(positive_caches$grid))
+# 
+# #how many squirrels?
+# length(unique(positive_caches$squirrel_id))
 
 # dummy plot for predictions ----------------------------------------------
 dummy_data <- tibble(

@@ -5,14 +5,12 @@ source("Scripts/00-packages.R")
 con <- krsp_connect (host = "krsp.cepb5cjvqban.us-east-2.rds.amazonaws.com",
                      dbname ="krsp",
                      username = Sys.getenv("krsp_user"),
-                     password = Sys.getenv("krsp_password")
-)
+                     password = Sys.getenv("krsp_password"))
 
 con_suppl <- krsp_connect (host = "krsp.cepb5cjvqban.us-east-2.rds.amazonaws.com",
                            dbname ="krsp_suppl",
                            username = Sys.getenv("krsp_user"),
-                           password = Sys.getenv("krsp_password")
-)
+                           password = Sys.getenv("krsp_password"))
 
 #pull in tables
 ##the supplementary tables are not updated in the annual data cleanup, so squirrel_id values must be updated from the historic_squirrel_ids table
@@ -69,8 +67,7 @@ tree_cones <-tbl (con, "cones") %>%
   mutate(Year = as.numeric(Year), 
          NumNew = as.numeric(NumNew),
          cone_index = log(NumNew + 1),
-         total_cones = 1.11568 * exp(0.1681 + 1.1891 * log(NumNew + 0.01)) # according to Krebs et al. 2012
-  )
+         total_cones = 1.11568 * exp(0.1681 + 1.1891 * log(NumNew + 0.01))) # according to Krebs et al. 2012
 
 #mean cones per year
 yearly_cones <- group_by(tree_cones, Year) %>% 
