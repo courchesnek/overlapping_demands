@@ -28,7 +28,7 @@ females <- breeding %>%
     non_breeder = if_else(breed_status == 0, TRUE, FALSE))
     
 females <- females %>%
-  filter(grid %in% c("KL", "SU", "CH", "BT", "JO"))
+  filter(grid %in% c("KL", "SU", "CH"))
 
 #save
 write.csv(females, "Input/females.csv", row.names = FALSE)
@@ -51,7 +51,7 @@ mid_cones <- midden_cones %>%
   left_join(f %>% dplyr::select(year, squirrel_id, sex), by = c("year", "squirrel_id")) %>%
   mutate(sex = ifelse(sex.x == "F", sex.y, sex.x)) %>%
   dplyr::select(-sex.x, -sex.y) %>%
-  filter(grid %in% c("KL", "SU", "CH", "BT", "JO") | (grid == "JO" & year >= 2013)) %>%
+  filter(grid %in% c("KL", "SU", "CH")) %>%
   na.omit() %>%
   dplyr::select(year, grid, squirrel_id, sex, cache_size_new, log_cache_size_new, total_cones, log_total_cones)
 
@@ -120,7 +120,6 @@ model_output <- model_output %>%
   mutate(across(c(estimate, std.error, zvalue, pvalue), ~round(., 4)))
 
 write.csv(model_output, "Output/model_output.csv", row.names = FALSE)
-
 
 # generate predictions and compare between sexes --------------------------
 emm <- emmeans(model_positive, ~ sex, 
@@ -208,7 +207,10 @@ cache_by_sex <- positive_caches %>%
     ci_low_cache    = mean_cache - tcrit_cache * se_cache,
     ci_high_cache   = mean_cache + tcrit_cache * se_cache,
     min_cache       = ifelse(n_cache > 0, min(cache_size_new, na.rm = TRUE), NA_real_),
-    max_cache       = ifelse(n_cache > 0, max(cache_size_new, na.rm = TRUE), NA_real_))
+    max_cache       = ifelse(n_cache > 0, max(cache_size_new, na.rm = TRUE), NA_real_)) %>%
+  mutate(across(c(mean_cache, sd_cache, se_cache, ci_low_cache, ci_high_cache,
+                  min_cache, max_cache),
+                ~ round(.)))
 
 # 2) year-level cone availability (n = 14)
 avail_year <- positive_caches %>%
@@ -222,55 +224,58 @@ avail_year <- positive_caches %>%
     ci_lo_av  = mean_av - tcrit * se_av,
     ci_hi_av  = mean_av + tcrit * se_av,
     min_av    = min(total_cones, na.rm = TRUE),
-    max_av    = max(total_cones, na.rm = TRUE))
+    max_av    = max(total_cones, na.rm = TRUE)) %>%
+  mutate(across(c(mean_av, sd_av, se_av, ci_lo_av, ci_hi_av,
+                  min_av, max_av),
+                ~ round(.)))
 
 #save summary tables
 write.csv(cache_by_sex, file = "Output/cache_summary.csv", row.names = FALSE)
 write.csv(avail_year, file = "Output/treecones_summary.csv", row.names = FALSE)
 
-# #how many years of data?
-# length(unique(positive_caches$year))
-# unique(positive_caches$year)
-# 
-# #how many grids?
-# length(unique(positive_caches$grid))
-# 
-# #how many squirrels?
-# length(unique(positive_caches$squirrel_id))
+#how many years of data?
+length(unique(positive_caches$year))
+unique(positive_caches$year)
+
+#how many grids?
+length(unique(positive_caches$grid))
+
+#how many squirrels?
+length(unique(positive_caches$squirrel_id))
 
 # dummy plot for predictions ----------------------------------------------
-dummy_data <- tibble(
-  sex = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
-  predicted  = c(3000, 3000, 3000, 1500),
-  lower      = c(2800, 2800, 2800, 1300),
-  upper      = c(3200, 3200, 3200, 1700)) %>%
-  mutate(sex = factor(c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
-                 levels = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating")))
-
-dummy_plot <- ggplot(dummy_data, aes(x = sex, y = predicted, colour = sex)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  labs(x = "Sex",
-       y = "Number of New Cones Cached",
-       title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
-  theme_minimal() +
-  theme(text = element_text(size = 22),
-        plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
-        axis.title = element_text(size = 18),
-        axis.title.x = element_text(margin = margin(t=15), size = 22),
-        axis.title.y = element_text(margin = margin(r=15), size = 22),
-        axis.text.x = element_text(hjust = 0.5, color = "black"),
-        axis.text.y = element_text(color = "black"),
-        plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
-        legend.position = "none")
-
-dummy_plot
-
-
-#save
-ggsave("Output/dummy_plot.jpeg", plot = dummy_plot, width = 12, height = 7)
-
-
+# dummy_data <- tibble(
+#   sex = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
+#   predicted  = c(3000, 3000, 3000, 1500),
+#   lower      = c(2800, 2800, 2800, 1300),
+#   upper      = c(3200, 3200, 3200, 1700)) %>%
+#   mutate(sex = factor(c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating"),
+#                  levels = c("Males", "Female:Non-Breeder", "Female:Weaned", "Female:Lactating")))
+# 
+# dummy_plot <- ggplot(dummy_data, aes(x = sex, y = predicted, colour = sex)) +
+#   geom_point(size = 4) +
+#   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+#   labs(x = "Sex",
+#        y = "Number of New Cones Cached",
+#        title = "Effect of Sex and Lactation Status on Cone Caching\nAdjusted by Cone Availability") +
+#   theme_minimal() +
+#   theme(text = element_text(size = 22),
+#         plot.title = element_text(size = 25, face = "bold", hjust = 0.5),
+#         axis.title = element_text(size = 18),
+#         axis.title.x = element_text(margin = margin(t=15), size = 22),
+#         axis.title.y = element_text(margin = margin(r=15), size = 22),
+#         axis.text.x = element_text(hjust = 0.5, color = "black"),
+#         axis.text.y = element_text(color = "black"),
+#         plot.margin = margin(t = 20, r = 20, b = 10, l = 20),
+#         legend.position = "none")
+# 
+# dummy_plot
+# 
+# 
+# #save
+# ggsave("Output/dummy_plot.jpeg", plot = dummy_plot, width = 12, height = 7)
+# 
+# 
 
 
 
